@@ -25,8 +25,16 @@ class PollController extends Controller
             'title' => 'required|string|max:191',
             'description' => 'required|string',
             'deadline' => 'required|date_format:Y-m-d H:i:s',
-            'choices' => 'required|array'
+            'choices' => 'required|array|min:2'
         ]);
+
+        $uniqueArray = array_unique($request->choices);
+
+        if (count($request->choices) !== count($uniqueArray)){
+            return response()->json([
+                'error' => 'Array must be unique'
+            ], 403);
+        }
 
         if ($validator->fails()) {
             return response()->json([
@@ -77,7 +85,7 @@ class PollController extends Controller
 
     public function delete(Request $request): JsonResponse
     {
-        $poll = Poll::findOrFail($request->id);
+        $poll = Poll::find($request->id);
 
         if(!$poll){
             return response()->json([
