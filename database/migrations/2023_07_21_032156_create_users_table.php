@@ -15,9 +15,9 @@ return new class extends Migration
             $table->id();
             $table->unsignedBigInteger('division_id')->nullable(true);
             $table->string('username', 191);
-            $table->string('password', 191);
+            $table->string('password', 191)->default('default123');
             $table->string('role', 191)->nullable(true)->default('user');
-            $table->timestamps();
+            $table->timestampsTz();
 
             $table->foreign('division_id')->references('id')->on('divisions');
         });

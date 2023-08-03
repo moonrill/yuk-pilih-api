@@ -13,6 +13,7 @@ class Poll extends Model
     protected $primaryKey = 'id';
     protected $guarded = ['id'];
     protected $with = ['choices'];
+    protected $hidden = ['updated_at'];
 
     public function user()
     {

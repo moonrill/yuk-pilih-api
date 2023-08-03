@@ -42,19 +42,23 @@ class AuthController extends Controller
         }
 
         $payload = auth()->payload();
+        $user = Auth::user();
+        $status = 200;
+//        if ($user['created_at'] == $user['updated_at']){
+//            $status = 307;
+//        }
 
         return response()->json([
             'access_token' =>  $token,
             'token_type' => 'bearer',
-            'expires_in' => Carbon::parse($payload('exp'))->setTimezone('Asia/Jakarta')->format('H:i:s, d-m-Y')
-        ], 200);
+            'expires_in' => Carbon::parse($payload('exp'))->setTimezone('Asia/Jakarta')->format('H:i:s, d-m-Y'),
+        ], $status);
     }
 
     public function register(Request $request) : JsonResponse
     {
         $validator = Validator::make($request->all(), [
            'username' => 'required|string|max:191',
-           'password' =>  'required|string|max:191',
             'division_id' => 'integer'
         ]);
 
