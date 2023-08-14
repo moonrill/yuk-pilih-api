@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use Carbon\Carbon;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 
@@ -14,6 +15,7 @@ class Poll extends Model
     protected $guarded = ['id'];
     protected $with = ['choices'];
     protected $hidden = ['updated_at'];
+    protected $casts = ['deadline' => 'datetime'];
 
     public function user()
     {
@@ -23,5 +25,10 @@ class Poll extends Model
     public function choices()
     {
         return $this->hasMany(Choice::class);
+    }
+
+    public function votes()
+    {
+        return $this->hasMany(Vote::class);
     }
 }

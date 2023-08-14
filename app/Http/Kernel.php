@@ -2,7 +2,8 @@
 
 namespace App\Http;
 
-use App\Http\Middleware\CheckPoll;
+use App\Http\Middleware\CheckVoted;
+use App\Http\Middleware\CheckRole;
 use Illuminate\Foundation\Http\Kernel as HttpKernel;
 
 class Kernel extends HttpKernel
@@ -67,6 +68,7 @@ class Kernel extends HttpKernel
         'verified' => \Illuminate\Auth\Middleware\EnsureEmailIsVerified::class,
     ];
     protected  $routeMiddleware =[
-        'check'=> CheckPoll::class
+        'check'=> CheckRole::class,
+        'hasVote' => CheckVoted::class
     ];
 }

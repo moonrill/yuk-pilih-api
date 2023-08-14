@@ -16,6 +16,7 @@ class User extends Authenticable implements JWTSubject
     protected $primaryKey = 'id';
     protected $hidden = ['password', 'role'];
     protected $fillable = ['division_id', 'username', 'password'];
+    protected $with = ['votes'];
 
     public function division()
     {
@@ -25,6 +26,11 @@ class User extends Authenticable implements JWTSubject
     public function polls()
     {
         return $this->hasMany(Poll::class);
+    }
+
+    public function votes()
+    {
+        return $this->hasMany(Vote::class);
     }
 
     public function getJWTIdentifier()

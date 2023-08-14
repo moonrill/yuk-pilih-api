@@ -6,7 +6,7 @@ use Closure;
 use Illuminate\Http\Request;
 use Symfony\Component\HttpFoundation\Response;
 
-class CheckPoll
+class CheckRole
 {
     /**
      * Handle an incoming request.
@@ -15,7 +15,9 @@ class CheckPoll
      */
     public function handle(Request $request, Closure $next, $role): Response
     {
-        if ($request->user()['role'] === $role){
+        $user = auth()->user();
+
+        if ($user->role === $role){
             return $next($request);
         }
         abort(response()->json(['error'=>'Unauthorized'],401));

@@ -2,6 +2,7 @@
 
 use App\Http\Controllers\Api\AuthController;
 use App\Http\Controllers\Api\PollController;
+use App\Http\Controllers\VoteController;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
 
@@ -23,9 +24,10 @@ Route::controller(AuthController::class)->prefix('auth')->group(function () {
     Route::get('me', 'me');
     Route::post('reset-password', 'reset');
 });
-Route::controller(PollController::class)->group(function () {
+Route::controller(PollController::class)->middleware('auth')->group(function () {
     Route::get('poll', 'getAll');
     Route::post('poll', 'create');
-   Route::get('poll/{id}', 'getPoll');
-   Route::delete('poll/{id}', 'delete');
+    Route::get('poll/{id}', 'getPoll');
+    Route::post('poll/{id}/vote/{choice_id}', 'vote');
+    Route::delete('poll/{id}', 'delete');
 });

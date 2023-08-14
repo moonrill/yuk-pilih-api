@@ -12,4 +12,19 @@ class Vote extends Model
     protected $table = 'votes';
     protected $primaryKey = 'id';
     protected $guarded = ['id'];
+
+    public function choice()
+    {
+        return $this->belongsTo(Choice::class);
+    }
+
+    public function poll()
+    {
+        return $this->belongsTo(Poll::class);
+    }
+
+    public function user()
+    {
+        return $this->belongsTo(User::class);
+    }
 }

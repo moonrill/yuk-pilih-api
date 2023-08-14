@@ -17,4 +17,9 @@ class Division extends Model
     {
         return $this->hasMany(User::class);
     }
+
+    public function votes()
+    {
+        return $this->hasMany(Vote::class);
+    }
 }
