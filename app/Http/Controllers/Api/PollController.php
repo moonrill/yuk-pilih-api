@@ -4,10 +4,12 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use App\Models\Choice;
+use App\Models\Division;
 use App\Models\Poll;
 use App\Models\User;
 use App\Models\Vote;
 use Carbon\Carbon;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\ModelNotFoundException;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -16,11 +18,10 @@ use function PHPUnit\Framework\isEmpty;
 
 class PollController extends Controller
 {
-
     public function __construct()
     {
-//        $this->middleware(['hasVote']);
-//        $this->middleware(['check:admin'])->except('vote');
+        // $this->middleware(['hasVote']);
+       $this->middleware(['check:admin'])->only(['create', 'delete']);
     }
 
     public function create(Request $request): JsonResponse
@@ -82,12 +83,14 @@ class PollController extends Controller
             $allPoll = Poll::all()->toArray();
 
             foreach ($allPoll as $poll) {
-                foreach ($poll['choices'] as $choice){
-                    $result = [...$result, ['id' => $choice['id'], 'choice' => $choice['choice'], 'point' => 1]];
-                }
-
                 $creator = User::firstWhere('id', $poll['created_by']);
-                $res = [...$res, [...$poll, 'creator' => $creator->username, 'result' => $result]];
+                $res =
+                    [...$res,
+                        [...$poll,
+                            'creator' => $creator->username,
+                            'result' => $this->getResult($poll['id'])
+                        ]
+                    ];
             }
         }
 
@@ -150,6 +153,30 @@ class PollController extends Controller
         return response()->json([
             'message' => 'Delete success!'
         ], 200);
+    }
+
+    protected function getResult($pollId)
+    {
+        $choices = Choice::with('votes')->where('poll_id', $pollId)->get(['id', 'choice']);
+        $points = [];
+
+        foreach($choices as $choice) {
+            $votesByDivision = $choice->votes->groupBy('division.name');
+
+            foreach ($votesByDivision as $division => $votes) {
+                $votesCount = count($votes);
+
+                if (!isset($points[$division])) {
+                    $points[$division] = [];
+                }
+                $points[$division][$choice->choice] = $votesCount;
+
+                // TODO: Calculate points of each division
+            }            
+        }
+
+
+        return $points;
     }
 
     public function vote(Request $request): JsonResponse

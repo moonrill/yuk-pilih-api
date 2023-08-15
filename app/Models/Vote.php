@@ -12,7 +12,10 @@ class Vote extends Model
     protected $table = 'votes';
     protected $primaryKey = 'id';
     protected $guarded = ['id'];
-
+    public function division()
+    {
+        return $this->belongsTo(Division::class);
+    }
     public function choice()
     {
         return $this->belongsTo(Choice::class);
