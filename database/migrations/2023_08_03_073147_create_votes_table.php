@@ -19,10 +19,18 @@ return new class extends Migration
             $table->timestampsTz();
             $table->unsignedBigInteger('division_id');
 
-            $table->foreign('choice_id')->references('id')->on('choices');
-            $table->foreign('user_id')->references('id')->on('users');
-            $table->foreign('poll_id')->references('id')->on('polls');
-            $table->foreign('division_id')->references('id')->on('divisions');
+            $table->foreign('choice_id')->references('id')->on('choices')
+                ->cascadeOnDelete()
+                ->cascadeOnUpdate();
+            $table->foreign('user_id')->references('id')->on('users')
+                ->cascadeOnDelete()
+                ->cascadeOnUpdate();
+            $table->foreign('poll_id')->references('id')->on('polls')
+                ->cascadeOnDelete()
+                ->cascadeOnUpdate();
+            $table->foreign('division_id')->references('id')->on('divisions')
+                ->cascadeOnDelete()
+                ->cascadeOnUpdate();
         });
     }
 

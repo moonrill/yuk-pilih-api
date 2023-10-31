@@ -17,7 +17,9 @@ return new class extends Migration
             $table->unsignedBigInteger('poll_id');
             $table->timestampsTz();
 
-            $table->foreign('poll_id')->constrained()->references('id')->on('polls')->onDelete('cascade');
+            $table->foreign('poll_id')->constrained()->references('id')->on('polls')
+                ->cascadeOnDelete()
+                ->cascadeOnUpdate();
         });
     }
 

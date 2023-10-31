@@ -19,7 +19,9 @@ return new class extends Migration
             $table->string('role', 191)->nullable(true)->default('user');
             $table->timestampsTz();
 
-            $table->foreign('division_id')->references('id')->on('divisions');
+            $table->foreign('division_id')->references('id')->on('divisions')
+                ->cascadeOnDelete()
+                ->cascadeOnUpdate();
         });
     }
 
