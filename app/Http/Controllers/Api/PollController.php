@@ -3,90 +3,91 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
+use App\Http\Requests\CreatePollRequest;
 use App\Models\Choice;
 use App\Models\Division;
 use App\Models\Poll;
 use App\Models\User;
 use App\Models\Vote;
 use Carbon\Carbon;
-use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\ModelNotFoundException;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Validator;
-use function PHPUnit\Framework\isEmpty;
 
 class PollController extends Controller
 {
     public function __construct()
     {
         // $this->middleware(['hasVote']);
-       $this->middleware(['check:admin'])->only(['create', 'delete']);
+        $this->middleware(['check:admin'])->only(['create', 'delete']);
+        $this->middleware(['check:user'])->only('vote');
     }
 
-    public function create(Request $request): JsonResponse
+    /**
+     * Creates a new poll with the given request data.
+     *
+     * @param CreatePollRequest $request The request data for creating a poll.
+     * @throws \Illuminate\Validation\ValidationException The exception that may be thrown.
+     * @return JsonResponse The JSON response containing the created poll.
+     */
+    public function create(CreatePollRequest $request): JsonResponse
     {
         $user = auth()->user();
 
-        $validator = Validator::make($request->only(['title', 'description', 'deadline', 'choices']), [
-            'title' => 'required|string|max:191',
-            'description' => 'required|string',
-            'deadline' => 'required|date_format:Y-m-d H:i:s',
-            'choices' => 'required|array|min:2'
-        ]);
+        $data = $request->validated();
+        $choices = $request->choices;
 
         // Checking array have same value
-        $uniqueArray = array_unique($request->choices);
+        $uniqueChoices = array_unique($request->choices);
 
-        if (count($request->choices) !== count($uniqueArray)) {
+        if (count($choices) !== count($uniqueChoices)) {
             return response()->json([
-                'error' => 'Array must be unique'
-            ], 403);
-        }
-
-        if ($validator->fails()) {
-            return response()->json([
-                'error' => 'The given data was invalid.',
+                'message' => 'Choices must be unique'
             ], 422);
         }
 
         // Create Poll
-        $poll = Poll::create([
-            'title' => $request->title,
-            'description' => $request->description,
-            'deadline' => $request->deadline,
-            'created_by' => $user["id"]
+        $poll = Poll::query()->create([
+            ...$data,
+            'created_by' => $user->id,
         ]);
 
+        // Create choices
         foreach ($request->choices as $choice) {
-            Choice::create([
+            Choice::query()->create([
                 'choice' => $choice,
-                'poll_id' => $poll['id']
+                'poll_id' => $poll->id
             ]);
         }
 
         if (count($request->choices) < 2) {
             return response()->json([
-                'error' => 'The given data was invalid.',
+                'message' => 'The given data was invalid.',
             ], 422);
         }
 
         return response()->json($poll, 200);
     }
 
+    /**
+     * Retrieves all the data from the database.
+     *
+     * @return JsonResponse Returns a JSON response containing the retrieved data.
+     */
     public function getAll(): JsonResponse
     {
         $user = auth()->user();
-        $res = [];
         $result = [];
         if ($user->role == 'admin') {
-            $allPoll = Poll::all()->toArray();
+            $allPolls = Poll::all()->toArray();
 
-            foreach ($allPoll as $poll) {
+            foreach ($allPolls as $poll) {
                 $creator = User::firstWhere('id', $poll['created_by']);
-                $res =
-                    [...$res,
-                        [...$poll,
+                $result =
+                    [
+                        ...$result,
+                        [
+                            ...$poll,
                             'creator' => $creator->username,
                             'result' => $this->getResult($poll['id'])
                         ]
@@ -95,42 +96,56 @@ class PollController extends Controller
         }
 
         if ($user->role == 'user') {
-            $expiredPoll = Poll::where('deadline', '<', Carbon::now())->get();
+            $expiredPoll = Poll::query()->where('deadline', '<', Carbon::now())->get();
 
             foreach ($user->votes as $vote) {
                 $poll = Poll::where('id', $vote->poll_id)->first();
-                $res = ['user_votes' => [...$res, $poll]];
+                $poll['result'] = $this->getResult($vote->poll_id);
+                $result['user_votes'] = [...$result, $poll];
             }
 
-            $res = [...$res, 'expired_poll' => $expiredPoll];
+            foreach ($expiredPoll as $poll) {
+                $poll['result'] = $this->getResult($poll->id);
+                $result['expired_polls'][] = $poll;
+            }
         }
 
-        return response()->json($res, 200);
+        return response()->json($result, 200);
     }
 
+    /**
+     * Retrieves a poll based on the provided request.
+     *
+     * @param Request $request The request object containing the poll ID.
+     * @throws ModelNotFoundException If the poll with the provided ID is not found.
+     * @return JsonResponse The JSON response containing the poll data.
+     */
     public function getPoll(Request $request): JsonResponse
     {
         try {
-            $poll = Poll::findOrFail($request->id);
+            $poll = Poll::query()->findOrFail($request->id);
+            $poll['result'] = $this->getResult($request->id);
+            $poll['creator'] = User::firstWhere('id', $poll['created_by'])->username;
             $user = auth()->user();
-            if ($user->role == 'admin') {
-                return response()->json($poll, 200);
-            }
-
 
             if ($user->role == 'user') {
+                $hasVoted = false;
                 foreach ($user->votes as $vote) {
                     if ($vote->poll_id == $request->id) {
+                        $hasVoted = true;
                         break;
                     }
+                }
+
+                if (!$hasVoted) {
                     $poll = Poll::where([
                         ['id', $request->id],
                         ['deadline', '<', Carbon::now()]
                     ])->first();
+                    $poll['result'] = $this->getResult($request->id);
                 }
-
-                return response()->json($poll, 200);
             }
+            return response()->json($poll, 200);
         } catch (ModelNotFoundException $e) {
             return response()->json([
                 'error' => 'Not Found'
@@ -138,6 +153,12 @@ class PollController extends Controller
         }
     }
 
+    /**
+     * Deletes a poll.
+     *
+     * @param Request $request The request object.
+     * @return JsonResponse The JSON response.
+     */
     public function delete(Request $request): JsonResponse
     {
         $poll = Poll::find($request->id);
@@ -155,35 +176,64 @@ class PollController extends Controller
         ], 200);
     }
 
-    protected function getResult($pollId)
+
+    /**
+     * Get the result of a poll.
+     *
+     * @param int $pollId
+     */
+    public function getResult(int $pollId)
     {
-        $choices = Choice::with('votes')->where('poll_id', $pollId)->get(['id', 'choice']);
-        $points = [];
+        $poll = Poll::find($pollId);
+        $choices = $poll->choices;
 
-        foreach($choices as $choice) {
-            $votesByDivision = $choice->votes->groupBy('division.name');
-
-            foreach ($votesByDivision as $division => $votes) {
-                $votesCount = count($votes);
-
-                if (!isset($points[$division])) {
-                    $points[$division] = [];
-                }
-                $points[$division][$choice->choice] = $votesCount;
-
-                // TODO: Calculate points of each division
-            }            
+        $choicePoints = [];
+        foreach ($choices as $choice) {
+            $choicePoints[$choice->choice] = 0;
         }
 
+        $divisions = Division::all();
+        foreach ($divisions as $division) {
+            $votes = $division->votes;
+            $totalVotes = count($votes);
 
-        return $points;
+            if ($totalVotes > 0) {
+                // Calculate the points for each choice in this division
+                foreach ($choices as $choice) {
+                    $choiceCount = $votes->where('choice', $choice)->count();
+                    $choicePoints[$choice->choice] += $choiceCount / $totalVotes;
+                }
+            }
+        }
+
+        // Calculate the percentage for each choice
+        $totalPoints = array_sum($choicePoints);
+        $percentageResults = [];
+        foreach ($choices as $choice) {
+            if ($totalPoints > 0 && $choicePoints[$choice->choice] > 0) {
+                $percentage = ($choicePoints[$choice->choice] / $totalPoints) * 100;
+                $percentageResults[$choice->choice] = round($percentage, 4);
+            } else {
+                // Handle the case where either totalPoints or choicePoints is zero for this choice.
+                $percentageResults[$choice->choice] = 0;
+            }
+        }
+
+        return $percentageResults;
     }
 
+    /**
+     * Vote for a poll.
+     *
+     * @param Request $request The HTTP request object.
+     * @throws ModelNotFoundException If the poll or choice is not found.
+     * @return JsonResponse The JSON response containing the result of the voting.
+     */
     public function vote(Request $request): JsonResponse
     {
         $user = auth()->user();
         try {
-            $poll = Poll::findOrFail($request->id);
+            $poll = Poll::findOrFail($request->poll_id);
             $choice = Choice::findOrFail($request->choice_id);
         } catch (ModelNotFoundException $exception) {
             return response()->json([
@@ -191,13 +241,9 @@ class PollController extends Controller
             ], 422);
         }
 
-        if ($user['role'] == 'admin') {
-            return response()->json(['error' => 'Unauthorized'], 401);
-        }
-
         // Check user already voted
         foreach ($user->votes as $vote) {
-            if ($vote->poll_id == $request->id) {
+            if ($vote->poll_id == $request->poll_id) {
                 return response()->json([
                     'message' => 'Already voted.'
                 ], 422);
@@ -212,15 +258,14 @@ class PollController extends Controller
         }
 
         $vote = Vote::create([
-            'choice_id' => (int)$request->choice_id,
+            'choice_id' => (int) $request->choice_id,
             'user_id' => $user['id'],
-            'poll_id' => (int)$request->id,
-            'division_id' => $user['division_id']
+            'poll_id' => (int) $request->poll_id,
+            'division_id' => $user->division_id,
         ]);
 
         return response()->json([
             'message' => 'Voting success',
-
         ], 200);
     }
 }
