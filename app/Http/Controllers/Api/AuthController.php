@@ -3,7 +3,6 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
-use App\Http\Requests\UserStoreRequest;
 use App\Models\User;
 use Carbon\Carbon;
 use Illuminate\Http\JsonResponse;
@@ -11,54 +10,61 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Validator;
-use Tymon\JWTAuth\Facades\JWTAuth;
 
 class AuthController extends Controller
 {
     public function __construct()
     {
-        $this->middleware('auth:api', ['except' => ['login', 'register']]);
+        $this->middleware('auth', ['except' => ['login', 'register']]);
     }
 
-    public function login(Request $request) : JsonResponse
+    /**
+     * Logs in a user.
+     *
+     * @param Request $request The HTTP request object.
+     * @return JsonResponse The JSON response containing the access token, token type, and expiration time.
+     */
+    public function login(Request $request): JsonResponse
     {
         $validator = Validator::make($request->all(), [
             'username' => 'required',
             'password' => 'required'
         ]);
 
-        if ($validator->errors()->isNotEmpty()) {
+        if ($validator->fails()) {
             return response()->json([
-                'error' => $validator->getMessageBag()
-            ],401);
+                'message' => "Username or password do not match or empty"
+            ], 401);
         }
 
         $token = Auth::attempt($request->only(['username', 'password']));
 
-        if(!$token) {
+        if (!$token) {
             return response()->json([
-                'error' => 'Unauthorized'
+                'message' => "Username or password do not match or empty"
             ], 401);
         }
 
         $payload = auth()->payload();
-        $user = Auth::user();
-        $status = 200;
-//        if ($user['created_at'] == $user['updated_at']){
-//            $status = 307;
-//        }
+        $expiresIn = Carbon::parse($payload('exp'))->setTimezone('Asia/Jakarta')->format('H:i:s, d-m-Y');
 
         return response()->json([
-            'access_token' =>  $token,
+            'access_token' => $token,
             'token_type' => 'bearer',
-            'expires_in' => Carbon::parse($payload('exp'))->setTimezone('Asia/Jakarta')->format('H:i:s, d-m-Y'),
-        ], $status);
+            'expires_in' => $expiresIn,
+        ], 200);
     }
 
-    public function register(Request $request) : JsonResponse
+    /**
+     * Registers a new user.
+     *
+     * @param Request $request The request object containing the user details.
+     * @return JsonResponse The JSON response containing the status and message.
+     */
+    public function register(Request $request): JsonResponse
     {
         $validator = Validator::make($request->all(), [
-           'username' => 'required|string|max:191',
+            'username' => 'required|string|max:191',
             'division_id' => 'integer'
         ]);
 
@@ -71,7 +77,7 @@ class AuthController extends Controller
 
         $userAlreadyExists = User::where('username', $request->username)->first();
 
-        if($userAlreadyExists) {
+        if ($userAlreadyExists) {
             return response()->json([
                 'status' => 'error',
                 'message' => 'User already exists',
@@ -81,7 +87,7 @@ class AuthController extends Controller
         $user = User::create([
             'username' => $request->username,
             'password' => Hash::make($request->password),
-            'divison_id' => $request->division_id,
+            'division_id' => $request->division_id,
             'role' => 'user'
         ]);
 
@@ -92,20 +98,37 @@ class AuthController extends Controller
         ]);
     }
 
-    public function logout() : JsonResponse
+    /**
+     * Logs out the user and returns a JSON response with a success message.
+     *
+     * @return JsonResponse
+     */
+    public function logout(): JsonResponse
     {
         auth()->logout();
 
         return response()->json([
             'message' => 'Succesfully logged out'
-        ],200);
+        ], 200);
     }
 
+    /**
+     * Retrieves the authenticated user's information.
+     *
+     * @return JsonResponse The JSON response containing the user's information.
+     */
     public function me(): JsonResponse
     {
-        return response()->json(auth()->user(),200);
+        return response()->json(auth()->user(), 200);
     }
 
+    /**
+     * Reset the user's password.
+     *
+     * @param Request $request The request object containing the old password and new password.
+     * @throws \Illuminate\Validation\ValidationException If the validation fails.
+     * @return JsonResponse The JSON response containing the status and message.
+     */
     public function reset(Request $request)
     {
         $validator = Validator::make($request->only(['old_password', 'new_password']), [
@@ -142,6 +165,6 @@ class AuthController extends Controller
 
         return response()->json([
             'message' => 'Reset success, user logged out'
-        ],200);
+        ], 200);
     }
 }

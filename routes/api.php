@@ -17,17 +17,32 @@ use Illuminate\Support\Facades\Route;
 |
 */
 
-Route::controller(AuthController::class)->prefix('auth')->group(function () {
-    Route::post('register', 'register');
-    Route::post('login', 'login');
-    Route::post('logout', 'logout');
-    Route::get('me', 'me');
-    Route::post('reset-password', 'reset');
-});
-Route::controller(PollController::class)->middleware('auth')->group(function () {
-    Route::get('poll', 'getAll');
-    Route::post('poll', 'create');
-    Route::get('poll/{id}', 'getPoll');
-    Route::post('poll/{id}/vote/{choice_id}', 'vote');
-    Route::delete('poll/{id}', 'delete');
+// Define routes that require authentication
+Route::middleware('auth')->group(function() {
+    // Define routes for authentication
+    Route::controller(AuthController::class)->prefix('auth')->group(function () {
+        // Register a new user
+        Route::post('register', 'register')->withoutMiddleware('auth');
+        // Log in a user
+        Route::post('login', 'login')->withoutMiddleware('auth');
+        // Log out a user
+        Route::post('logout', 'logout');
+        // Get the currently authenticated user
+        Route::get('me', 'me');
+        // Reset a user's password
+        Route::post('reset-password', 'reset');
+    });
+    // Define routes for managing polls
+    Route::controller(PollController::class)->middleware('auth')->group(function () {
+        // Get all polls
+        Route::get('poll', 'getAll');
+        // Create a new poll
+        Route::post('poll', 'create');
+        // Get a specific poll
+        Route::get('poll/{id}', 'getPoll');
+        // Vote on a specific choice in a poll
+        Route::post('poll/{poll_id}/vote/{choice_id}', 'vote');
+        // Delete a poll
+        Route::delete('poll/{id}', 'delete');
+    });
 });
