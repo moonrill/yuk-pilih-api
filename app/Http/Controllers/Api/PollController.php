@@ -101,13 +101,14 @@ class PollController extends Controller
             foreach ($user->votes as $vote) {
                 $poll = Poll::where('id', $vote->poll_id)->first();
                 $poll['result'] = $this->getResult($vote->poll_id);
-                $result['user_votes'] = [...$result, $poll];
+                $result['user_votes'][] = $poll;
             }
-
+            
             foreach ($expiredPoll as $poll) {
                 $poll['result'] = $this->getResult($poll->id);
                 $result['expired_polls'][] = $poll;
             }
+
         }
 
         return response()->json($result, 200);
