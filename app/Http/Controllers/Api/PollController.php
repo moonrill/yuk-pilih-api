@@ -186,37 +186,50 @@ class PollController extends Controller
     {
         $poll = Poll::find($pollId);
         $choices = $poll->choices;
+        
+        // Get all votes from all division that vote for this poll
+        $divisions = Division::query()->with(['votes' => function($query) use($pollId) {
+            return $query->where('poll_id', $pollId);
+        }])->whereHas('votes', function($query) use($pollId) {
+            return $query->where('poll_id', $pollId);
+        })->get();
+        
+        $totalPoints = $divisions->count();
 
-        $choicePoints = [];
+        // Assign the initial points to each choice
+        $totalChoicePoints = [];
         foreach ($choices as $choice) {
-            $choicePoints[$choice->choice] = 0;
+            $totalChoicePoints[$choice->choice] = 0;
         }
-
-        $divisions = Division::all();
+        
+        // Calculate the points for each choice in each division
         foreach ($divisions as $division) {
             $votes = $division->votes;
-            $totalVotes = count($votes);
+            $choicesCount = [];
 
-            if ($totalVotes > 0) {
-                // Calculate the points for each choice in this division
-                foreach ($choices as $choice) {
-                    $choiceCount = $votes->where('choice', $choice)->count();
-                    $choicePoints[$choice->choice] += $choiceCount / $totalVotes;
+            // Calculate the points for each choice in this division
+            foreach ($choices as $choice) {
+                $choicesCount[$choice->choice] = $votes->where('choice_id', $choice->id)->count();
+            }
+
+            $highestCount = max($choicesCount);
+            $winners = array_keys($choicesCount, $highestCount);
+
+            if (count($winners) === 1) {
+                $totalChoicePoints[$winners[0]] += 1;
+            } else {
+                $pointsPerWinner = 1 / count($winners);
+                foreach ($winners as $winner) {
+                    $totalChoicePoints[$winner] += $pointsPerWinner;
                 }
             }
         }
 
         // Calculate the percentage for each choice
-        $totalPoints = array_sum($choicePoints);
         $percentageResults = [];
         foreach ($choices as $choice) {
-            if ($totalPoints > 0 && $choicePoints[$choice->choice] > 0) {
-                $percentage = ($choicePoints[$choice->choice] / $totalPoints) * 100;
-                $percentageResults[$choice->choice] = round($percentage, 4);
-            } else {
-                // Handle the case where either totalPoints or choicePoints is zero for this choice.
-                $percentageResults[$choice->choice] = 0;
-            }
+            $percentage = ($totalChoicePoints[$choice->choice] / $totalPoints) * 100;
+            $percentageResults[$choice->choice] = round($percentage, 2);
         }
 
         return $percentageResults;
