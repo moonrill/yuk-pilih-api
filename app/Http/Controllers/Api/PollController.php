@@ -77,10 +77,10 @@ class PollController extends Controller
     public function getAll(): JsonResponse
     {
         $user = auth()->user();
+        $allPolls = Poll::all()->toArray();
         $result = [];
+        
         if ($user->role == 'admin') {
-            $allPolls = Poll::all()->toArray();
-
             foreach ($allPolls as $poll) {
                 $creator = User::firstWhere('id', $poll['created_by']);
                 $result =
@@ -96,19 +96,45 @@ class PollController extends Controller
         }
 
         if ($user->role == 'user') {
-            $expiredPoll = Poll::query()->where('deadline', '<', Carbon::now())->get();
+            $expiredPolls = Poll::query()->where('deadline', '<', Carbon::now())->get();
 
+            // Get polls that user has voted
             foreach ($user->votes as $vote) {
                 $poll = Poll::where('id', $vote->poll_id)->first();
                 $poll['result'] = $this->getResult($vote->poll_id);
                 $result['user_votes'][] = $poll;
             }
             
-            foreach ($expiredPoll as $poll) {
+            // Get expired polls
+            foreach ($expiredPolls as $poll) {
                 $poll['result'] = $this->getResult($poll->id);
                 $result['expired_polls'][] = $poll;
             }
 
+            // Get available polls
+            $skip = false;
+            foreach($allPolls as $poll) {
+                foreach ($user->votes as $vote) {
+                    if($poll['id'] == $vote->poll_id) {
+                        $skip = true;
+                        break;
+                    }
+                }
+                
+                foreach ($expiredPolls as $expPoll) {
+                    if($poll['id'] == $expPoll->id) {
+                        $skip = true;
+                        break;
+                    }
+                }
+
+                if($skip) {
+                    $skip = false;
+                    continue;
+                }
+
+                $result['available_polls'][] = $poll;
+            }
         }
 
         return response()->json($result, 200);
@@ -195,12 +221,16 @@ class PollController extends Controller
             return $query->where('poll_id', $pollId);
         })->get();
         
-        $totalPoints = $divisions->count();
-
         // Assign the initial points to each choice
         $totalChoicePoints = [];
         foreach ($choices as $choice) {
             $totalChoicePoints[$choice->choice] = 0;
+        }
+
+        $totalDivisions = $divisions->count();
+
+        if($totalDivisions === 0) {
+            return $totalChoicePoints;
         }
         
         // Calculate the points for each choice in each division
@@ -229,7 +259,7 @@ class PollController extends Controller
         // Calculate the percentage for each choice
         $percentageResults = [];
         foreach ($choices as $choice) {
-            $percentage = ($totalChoicePoints[$choice->choice] / $totalPoints) * 100;
+            $percentage = ($totalChoicePoints[$choice->choice] / $totalDivisions) * 100;
             $percentageResults[$choice->choice] = round($percentage, 2);
         }
 
