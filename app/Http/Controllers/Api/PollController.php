@@ -77,26 +77,22 @@ class PollController extends Controller
     public function getAll(): JsonResponse
     {
         $user = auth()->user();
-        $allPolls = Poll::all()->toArray();
+        $allPolls = Poll::query()->orderByDesc('created_at')->get()->toArray();
         $result = [];
         
         if ($user->role == 'admin') {
             foreach ($allPolls as $poll) {
                 $creator = User::firstWhere('id', $poll['created_by']);
-                $result =
-                    [
-                        ...$result,
-                        [
-                            ...$poll,
-                            'creator' => $creator->username,
-                            'result' => $this->getResult($poll['id'])
-                        ]
-                    ];
+                $result[] = [
+                                ...$poll,
+                                'creator' => $creator->username,
+                                'result' => $this->getResult($poll['id'])
+                            ];
             }
         }
 
         if ($user->role == 'user') {
-            $expiredPolls = Poll::query()->where('deadline', '<', Carbon::now())->get();
+            $expiredPolls = Poll::query()->where('deadline', '<', Carbon::now())->orderBy('deadline')->get();
 
             // Get polls that user has voted
             foreach ($user->votes as $vote) {
