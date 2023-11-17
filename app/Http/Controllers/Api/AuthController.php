@@ -48,6 +48,14 @@ class AuthController extends Controller
         $payload = auth()->payload();
         $expiresIn = Carbon::parse($payload('exp'))->setTimezone('Asia/Jakarta')->format('H:i:s, d-m-Y');
 
+        if($request->password === 'password123') {
+            return response()->json([
+                'access_token' => $token,
+                'token_type' => 'bearer',
+                'expires_in' => $expiresIn,
+            ], 307);
+        }
+
         return response()->json([
             'access_token' => $token,
             'token_type' => 'bearer',
