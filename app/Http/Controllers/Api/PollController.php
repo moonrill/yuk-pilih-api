@@ -92,10 +92,11 @@ class PollController extends Controller
         }
 
         if ($user->role == 'user') {
-            $expiredPolls = Poll::query()->where('deadline', '<', Carbon::now())->orderBy('deadline')->get();
-
+            $expiredPolls = Poll::query()->where('deadline', '<', Carbon::now())->orderByDesc('created_at')->get();
+            $userVotes = $user->votes()->orderByDesc('created_at')->get();
+            
             // Get polls that user has voted
-            foreach ($user->votes as $vote) {
+            foreach ($userVotes as $vote) {
                 $poll = Poll::where('id', $vote->poll_id)->first();
                 $poll['result'] = $this->getResult($vote->poll_id);
                 $result['user_votes'][] = $poll;
